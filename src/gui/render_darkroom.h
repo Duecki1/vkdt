@@ -141,7 +141,7 @@ static inline void render_perf_overlay()
 }
 
 static inline void
-render_darkroom_widget(int modid, int parid, int is_fav_menu)
+render_darkroom_widget_label(int modid, int parid, int is_fav_menu, const char *label_override)
 {
   const dt_ui_param_t *param = vkdt.graph_dev.module[modid].so->param[parid];
   if(!param) return;
@@ -231,7 +231,8 @@ render_darkroom_widget(int modid, int parid, int is_fav_menu)
       dt_token_str(vkdt.graph_dev.module[modid].inst),
       dt_token_str(param->name), num);
   char str[64] = { 0 };
-  if(param->long_name) snprintf(str, sizeof(str), "%s", param->long_name);
+  if(label_override) snprintf(str, sizeof(str), "%s", label_override);
+  else if(param->long_name) snprintf(str, sizeof(str), "%s", param->long_name);
   else memcpy(str, &param->name, 8);
   // distinguish by type:
   if(param->widget.type == dt_token("slider"))
@@ -1424,8 +1425,8 @@ render_darkroom_widget(int modid, int parid, int is_fav_menu)
     {
       float *val = (float*)(vkdt.graph_dev.module[modid].param + param->offset) + 3*num + comp;
       float oldval = *val;
-      snprintf(string, sizeof(string), "%" PRItkn " %s",
-          dt_token_str(param->name),
+      snprintf(string, sizeof(string), "%s %s",
+          str,
           comp == 0 ? "red" : (comp == 1 ? "green" : "blue"));
       RESETBLOCK
       struct nk_rect bounds = nk_widget_bounds(ctx);
@@ -1461,6 +1462,80 @@ render_darkroom_widget(int modid, int parid, int is_fav_menu)
   } // end for multiple widgets
 #undef RESETBLOCK
 #undef KEYFRAME
+}
+
+static inline void
+render_darkroom_widget(int modid, int parid, int is_fav_menu)
+{
+  render_darkroom_widget_label(modid, parid, is_fav_menu, 0);
+}
+
+static inline int
+render_darkroom_widget_by_name(
+    const char *label,
+    const char *module,
+    const char *inst,
+    const char *param)
+{
+  int modid = dt_module_get(&vkdt.graph_dev, dt_token(module), dt_token(inst));
+  if(modid < 0) return 0;
+  int parid = dt_module_get_param(vkdt.graph_dev.module[modid].so, dt_token(param));
+  if(parid < 0) return 0;
+  render_darkroom_widget_label(modid, parid, 0, label);
+  return 1;
+}
+
+static inline void
+render_darkroom_lightroom_panel()
+{
+  struct nk_context *ctx = &vkdt.ctx;
+  vkdt.graph_dev.active_module = -1;
+
+  if(nk_tree_push(ctx, NK_TREE_TAB, "basic", NK_MAXIMIZED))
+  {
+    render_darkroom_widget_by_name("temperature",  "colour",  "01", "temp");
+    render_darkroom_widget_by_name("white balance", "colour",  "01", "white");
+    render_darkroom_widget_by_name("exposure",     "colour",  "01", "exposure");
+    render_darkroom_widget_by_name("contrast",     "filmcurv","01", "contrast");
+    render_darkroom_widget_by_name("highlights",   "llap",    "01", "hilights");
+    render_darkroom_widget_by_name("shadows",      "llap",    "01", "shadows");
+    render_darkroom_widget_by_name("whites",       "filmcurv","01", "light");
+    render_darkroom_widget_by_name("blacks",       "filmcurv","01", "bias");
+    nk_tree_pop(ctx);
+  }
+
+  if(nk_tree_push(ctx, NK_TREE_TAB, "presence", NK_MAXIMIZED))
+  {
+    render_darkroom_widget_by_name("texture",    "contrast", "01", "detail");
+    render_darkroom_widget_by_name("clarity",    "llap",     "01", "clarity");
+    render_darkroom_widget_by_name("dehaze",     "dehaze",   "01", "strength");
+    render_darkroom_widget_by_name("saturation", "colour",   "01", "sat");
+    nk_tree_pop(ctx);
+  }
+
+  if(nk_tree_push(ctx, NK_TREE_TAB, "detail", NK_MINIMIZED))
+  {
+    render_darkroom_widget_by_name("sharpening",          "usm",     "01", "amount");
+    render_darkroom_widget_by_name("sharpening threshold","usm",     "01", "thrs");
+    render_darkroom_widget_by_name("noise reduction",     "denoise", "01", "strength");
+    render_darkroom_widget_by_name("noise detail",        "denoise", "01", "detail");
+    nk_tree_pop(ctx);
+  }
+
+  if(nk_tree_push(ctx, NK_TREE_TAB, "effects", NK_MINIMIZED))
+  {
+    render_darkroom_widget_by_name("grain",       "grain", "01", "strength");
+    render_darkroom_widget_by_name("grain size",  "grain", "01", "size");
+    render_darkroom_widget_by_name("grain decay", "grain", "01", "decay");
+    nk_tree_pop(ctx);
+  }
+
+  if(nk_tree_push(ctx, NK_TREE_TAB, "geometry", NK_MINIMIZED))
+  {
+    render_darkroom_widget_by_name("crop",       "crop", "01", "crop");
+    render_darkroom_widget_by_name("straighten", "crop", "01", "rotate");
+    nk_tree_pop(ctx);
+  }
 }
 
 static inline void render_darkroom_widgets(

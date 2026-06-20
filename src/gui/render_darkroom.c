@@ -695,10 +695,10 @@ void render_darkroom()
     const float pad = row_height * 0.2;
     nk_style_push_vec2(ctx, &ctx->style.button.padding, nk_vec2(pad, pad));
     nk_style_push_float(ctx, &ctx->style.button.rounding, 0);
-    nk_layout_row_begin(ctx, NK_STATIC, row_height, 3);
-    const char *names[] = {"favourites", "tweak all", "esoteric"};
+    nk_layout_row_begin(ctx, NK_STATIC, row_height, 4);
+    const char *names[] = {"favourites", "simple", "tweak all", "esoteric"};
     static int current_tab = 0;
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < 4; i++)
     {
       const struct nk_user_font *f = ctx->style.font;
       float text_width = f->width(f->userdata, f->height, names[i], nk_strlen(names[i]));
@@ -724,7 +724,7 @@ void render_darkroom()
     if(current_tab == 0)
     {
       if(vkdt.wstate.pending_modid >= 0)
-        current_tab = 1; // switch to tweak-all when chord menu activated a module
+        current_tab = 2; // switch to tweak-all when chord menu activated a module
       else
       {
         vkdt.graph_dev.active_module = -1;
@@ -732,6 +732,27 @@ void render_darkroom()
       }
     }
     else if(current_tab == 1)
+    {
+      vkdt.graph_dev.active_module = -1;
+      static int simple_preset = 0;
+      int old_preset = simple_preset;
+      const char *simple_presets = "select preset\0Lightroom\0\0";
+      struct nk_vec2 combo_size = {0.7f * vkdt.state.panel_wd, 8.0f * row_height};
+      nk_layout_row(ctx, NK_DYNAMIC, row_height, 2, ratio);
+      nk_combobox_string(ctx, simple_presets, &simple_preset, 0x7fff, row_height, combo_size);
+      nk_label(ctx, "preset", NK_TEXT_LEFT);
+      if(simple_preset != old_preset && simple_preset == 1)
+      {
+        uint32_t err_lno = render_darkroom_apply_preset("lightroom.pst");
+        if(err_lno)
+          dt_gui_notification("failed to read lightroom.pst line %u", err_lno);
+        else
+          dt_gui_notification("applied Lightroom preset");
+      }
+      if(simple_preset == 1)
+        render_darkroom_lightroom_panel();
+    }
+    else if(current_tab == 2)
     {
       nk_layout_row_dynamic(ctx, row_height, 2);
       if(nk_widget_is_hovered(ctx))
@@ -769,7 +790,7 @@ void render_darkroom()
       }
       render_darkroom_full(filter_name, filter_inst);
     }
-    else if(current_tab == 2)
+    else if(current_tab == 3)
     {
       vkdt.graph_dev.active_module = -1;
       if(nk_tree_push(ctx, NK_TREE_TAB, "settings", NK_MINIMIZED))
